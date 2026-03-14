@@ -57,6 +57,13 @@ class Database:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS trade_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_id INTEGER NOT NULL,
+                note TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS price_alerts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 symbol TEXT NOT NULL,
@@ -194,6 +201,31 @@ class Database:
         rows = conn.execute(
             "SELECT * FROM recommendation_history ORDER BY created_at DESC LIMIT ?",
             (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # --- Trade Notes ---
+
+    def add_note(self, trade_id: int, note: str):
+        conn = self._get_conn()
+        conn.execute(
+            "INSERT INTO trade_notes (trade_id, note, created_at) VALUES (?, ?, ?)",
+            (trade_id, note, datetime.now().isoformat()),
+        )
+        conn.commit()
+
+    def get_notes(self, trade_id: int) -> list[dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM trade_notes WHERE trade_id = ? ORDER BY created_at", (trade_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_all_notes(self) -> list[dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT n.*, t.symbol, t.signal FROM trade_notes n "
+            "JOIN trades t ON n.trade_id = t.id ORDER BY n.created_at DESC LIMIT 30"
         ).fetchall()
         return [dict(r) for r in rows]
 

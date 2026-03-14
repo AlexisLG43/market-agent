@@ -88,6 +88,14 @@ def show_menu():
     menu.add_row("[14]", "Backtest strategy")
     menu.add_row("[15]", "Export data to CSV")
     menu.add_row("[16]", "Auto-scan mode")
+    menu.add_row("[17]", "Price chart")
+    menu.add_row("[18]", "Screener")
+    menu.add_row("[19]", "Correlation matrix")
+    menu.add_row("[20]", "Support / resistance levels")
+    menu.add_row("[21]", "Portfolio risk analysis")
+    menu.add_row("[22]", "Trade journal")
+    menu.add_row("[23]", "Earnings calendar")
+    menu.add_row("[24]", "News headlines")
     menu.add_row("[q]", "Quit")
     console.print(Panel(menu, title="[bold]Menu[/bold]", border_style="blue"))
     console.print()
@@ -862,4 +870,260 @@ def show_export_menu():
     menu.add_row("[r]", "Export recommendations only")
     menu.add_row("[c]", "Cancel")
     console.print(Panel(menu, title="[bold]Export to CSV[/bold]", border_style="blue"))
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# ASCII price chart
+# ---------------------------------------------------------------------------
+
+def show_price_chart(symbol: str, chart_lines: list[str], current_price: float, change_pct: float):
+    """Display ASCII price chart."""
+    ps = pnl_style(change_pct)
+    console.print(Panel(
+        f"  [bold cyan]{symbol}[/bold cyan]  "
+        f"Price: [bold]${current_price:,.2f}[/bold]  "
+        f"Change: [{ps}]{change_pct:+.2f}%[/{ps}]",
+        title="[bold]Price Chart[/bold]",
+        border_style="cyan",
+    ))
+    for line in chart_lines:
+        # Color up/down markers
+        colored = line.replace("^", "[green]^[/green]").replace("v", "[red]v[/red]")
+        console.print(f"  {colored}")
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Screener results
+# ---------------------------------------------------------------------------
+
+def show_screener_menu():
+    """Show screener preset options."""
+    menu = Table(show_header=False, box=None, padding=(0, 2))
+    menu.add_column(style="bold cyan")
+    menu.add_column()
+    menu.add_row("[1]", "Oversold (RSI < 30)")
+    menu.add_row("[2]", "Overbought (RSI > 70)")
+    menu.add_row("[3]", "Strong BUY signals (confidence > 30%)")
+    menu.add_row("[4]", "Strong SELL signals (confidence > 30%)")
+    menu.add_row("[5]", "Trending (ADX > 25)")
+    menu.add_row("[6]", "High volume (Volume > 1.5x avg)")
+    menu.add_row("[c]", "Cancel")
+    console.print(Panel(menu, title="[bold]Screener[/bold]", border_style="yellow"))
+    console.print()
+
+
+def show_screener_results(screen_name: str, results: list[tuple]):
+    """Show screener results."""
+    if not results:
+        console.print(f"  [dim]No assets match '{screen_name}'.[/dim]")
+        console.print()
+        return
+
+    table = Table(title=f"Screener: {screen_name} ({len(results)} matches)", border_style="yellow")
+    table.add_column("Symbol", style="bold cyan")
+    table.add_column("Type", style="dim")
+    table.add_column("Price", justify="right")
+    table.add_column("Signal")
+    table.add_column("Confidence", justify="right")
+    table.add_column("Score", justify="right")
+
+    for md, summary in results:
+        style = signal_style(summary.overall_signal)
+        table.add_row(
+            md.asset.symbol,
+            md.asset.asset_type.value,
+            f"${md.asset.current_price:,.2f}",
+            Text(summary.overall_signal.value, style=style),
+            f"{abs(summary.overall_score)*100:.0f}%",
+            f"{summary.overall_score:+.4f}",
+        )
+
+    console.print(table)
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Correlation matrix
+# ---------------------------------------------------------------------------
+
+def show_correlation_matrix(symbols: list[str], matrix: list[list[float]]):
+    """Display a correlation matrix."""
+    table = Table(title="Correlation Matrix (90-day returns)", border_style="magenta")
+    table.add_column("", style="bold cyan", min_width=10)
+
+    for sym in symbols:
+        table.add_column(sym[:6], justify="center", min_width=7)
+
+    for i, sym in enumerate(symbols):
+        row = [sym]
+        for j in range(len(symbols)):
+            val = matrix[i][j]
+            if i == j:
+                row.append("[dim]1.00[/dim]")
+            elif val > 0.7:
+                row.append(f"[bold red]{val:.2f}[/bold red]")
+            elif val > 0.4:
+                row.append(f"[yellow]{val:.2f}[/yellow]")
+            elif val < -0.3:
+                row.append(f"[green]{val:.2f}[/green]")
+            else:
+                row.append(f"[dim]{val:.2f}[/dim]")
+        table.add_row(*row)
+
+    console.print(table)
+    console.print("  [dim]Red = high correlation | Green = negative correlation | Yellow = moderate[/dim]")
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Support / resistance levels
+# ---------------------------------------------------------------------------
+
+def show_levels(symbol: str, current_price: float, levels: list, pivots: dict):
+    """Display support/resistance levels and pivot points."""
+    console.print(Panel(
+        f"  [bold cyan]{symbol}[/bold cyan]  Current: [bold]${current_price:,.2f}[/bold]",
+        title="[bold]Support & Resistance[/bold]",
+        border_style="blue",
+    ))
+
+    if levels:
+        table = Table(border_style="blue", show_lines=False)
+        table.add_column("Type", min_width=12)
+        table.add_column("Price", justify="right")
+        table.add_column("Strength", justify="right")
+        table.add_column("Distance")
+
+        for lv in levels:
+            style = "green" if lv.level_type == "support" else "red"
+            stars = "*" * min(lv.strength, 5)
+            table.add_row(
+                Text(lv.level_type.upper(), style=style),
+                f"${lv.price:,.2f}",
+                Text(stars, style=style),
+                lv.description,
+            )
+
+        console.print(table)
+    else:
+        console.print("  [dim]No significant levels detected.[/dim]")
+
+    if pivots:
+        p_table = Table(title="Pivot Points", border_style="dim", show_lines=False)
+        p_table.add_column("Level", style="bold")
+        p_table.add_column("Price", justify="right")
+        for name, price in pivots.items():
+            style = "green" if name.startswith("S") else "red" if name.startswith("R") else "bold"
+            p_table.add_row(Text(name, style=style), f"${price:,.2f}")
+        console.print(p_table)
+
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Portfolio risk analysis
+# ---------------------------------------------------------------------------
+
+def show_risk_analysis(metrics: dict):
+    """Display portfolio risk metrics."""
+    table = Table(title="Portfolio Risk Analysis", border_style="red")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+
+    for key, val in metrics.items():
+        if isinstance(val, float):
+            if "pct" in key.lower() or "ratio" in key.lower() or "drawdown" in key.lower():
+                style = pnl_style(val) if "return" in key.lower() else "white"
+                table.add_row(key, Text(f"{val:+.2f}%", style=style) if "pct" in key.lower() or "drawdown" in key.lower()
+                             else Text(f"{val:.3f}", style=style))
+            else:
+                table.add_row(key, f"${val:,.2f}")
+        else:
+            table.add_row(key, str(val))
+
+    console.print(table)
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Trade journal
+# ---------------------------------------------------------------------------
+
+def show_trade_journal(notes: list[dict]):
+    """Show trade journal entries."""
+    if not notes:
+        console.print("[dim]No journal entries yet.[/dim]")
+        console.print()
+        return
+
+    table = Table(title="Trade Journal", border_style="green")
+    table.add_column("Trade", style="bold cyan", min_width=12)
+    table.add_column("Note", max_width=60)
+    table.add_column("Time", style="dim")
+
+    for n in notes:
+        symbol = n.get("symbol", "?")
+        signal = n.get("signal", "?")
+        table.add_row(
+            f"{symbol} ({signal})",
+            n["note"],
+            n["created_at"][:16],
+        )
+
+    console.print(table)
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Earnings calendar
+# ---------------------------------------------------------------------------
+
+def show_earnings(earnings: list[tuple[str, dict]]):
+    """Show upcoming earnings for stocks."""
+    has_data = False
+
+    table = Table(title="Earnings Calendar", border_style="yellow")
+    table.add_column("Symbol", style="bold cyan")
+    table.add_column("Next Earnings", justify="right")
+    table.add_column("Details", style="dim")
+
+    for symbol, info in earnings:
+        if info:
+            has_data = True
+            date_str = info.get("date", "Unknown")
+            details = info.get("details", "")
+            table.add_row(symbol, str(date_str), details)
+
+    if has_data:
+        console.print(table)
+    else:
+        console.print("[dim]No earnings data available.[/dim]")
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# News headlines
+# ---------------------------------------------------------------------------
+
+def show_news(symbol: str, articles: list[dict]):
+    """Show news headlines for an asset."""
+    if not articles:
+        console.print(f"[dim]No news found for {symbol}.[/dim]")
+        console.print()
+        return
+
+    console.print(Panel(
+        f"  [bold cyan]{symbol}[/bold cyan] — Latest News",
+        title="[bold]News Headlines[/bold]",
+        border_style="blue",
+    ))
+
+    for i, article in enumerate(articles[:10], 1):
+        title = article.get("title", "No title")
+        publisher = article.get("publisher", "")
+        pub_str = f" [dim]({publisher})[/dim]" if publisher else ""
+        console.print(f"  {i:2}. {title}{pub_str}")
+
     console.print()

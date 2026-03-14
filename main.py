@@ -25,17 +25,26 @@ from ui.dashboard import (
     show_backtest_results,
     show_banner,
     show_closed_trades_for_selection,
+    show_correlation_matrix,
+    show_earnings,
     show_export_menu,
     show_indicator_detail,
+    show_levels,
     show_market_overview,
     show_menu,
     show_multi_timeframe,
+    show_news,
     show_performance_stats,
     show_portfolio,
     show_positions,
+    show_price_chart,
     show_recommendation_history,
     show_recommendations,
+    show_risk_analysis,
+    show_screener_menu,
+    show_screener_results,
     show_trade_history,
+    show_trade_journal,
     show_triggered_alerts,
     show_watchlist,
     show_watchlist_manager,
@@ -579,6 +588,259 @@ def auto_scan(executor: Executor, db: Database):
 
 
 # ---------------------------------------------------------------------------
+# 17. Price chart
+# ---------------------------------------------------------------------------
+
+def price_chart():
+    symbol = console.input("[bold]Symbol: [/bold]").strip().upper()
+    if not symbol:
+        return
+    console.print(f"[bold blue]Drawing chart for {symbol}...[/bold blue]")
+    try:
+        from analysis.charts import ascii_chart
+        md = fetch_asset(symbol, days=90)
+        chart_lines = ascii_chart(md.candles)
+        change_pct = 0.0
+        if len(md.candles) >= 2:
+            change_pct = ((md.candles[-1].close - md.candles[0].close) / md.candles[0].close) * 100
+        show_price_chart(symbol, chart_lines, md.asset.current_price, change_pct)
+    except Exception as e:
+        console.print(f"[red]Failed: {e}[/red]")
+
+
+# ---------------------------------------------------------------------------
+# 18. Screener
+# ---------------------------------------------------------------------------
+
+def run_screener():
+    from analysis.screener import screen, PRESET_SCREENS
+    show_screener_menu()
+    choice = console.input("[bold]> [/bold]").strip()
+
+    presets = {"1": "oversold", "2": "overbought", "3": "strong_buy",
+               "4": "strong_sell", "5": "trending", "6": "high_volume"}
+
+    if choice in presets:
+        name = presets[choice]
+        filters = PRESET_SCREENS[name]
+        console.print(f"[bold blue]Scanning for '{name}'...[/bold blue]")
+
+        market_data = _fetch_watchlist()
+        summaries = [(md, technical_analyze(md)) for md in market_data]
+        results = screen(summaries, filters)
+        show_screener_results(name, results)
+    elif choice == "c":
+        return
+
+
+# ---------------------------------------------------------------------------
+# 19. Correlation matrix
+# ---------------------------------------------------------------------------
+
+def correlation_matrix():
+    console.print("[bold blue]Computing correlation matrix...[/bold blue]")
+    import numpy as np
+    from analysis.technical import candles_to_df
+
+    market_data = _fetch_watchlist()
+    # Use a subset for readability
+    if len(market_data) > 12:
+        console.print(f"  [dim]Using first 12 assets for readability[/dim]")
+        market_data = market_data[:12]
+
+    symbols = []
+    returns_list = []
+
+    for md in market_data:
+        df = candles_to_df(md.candles)
+        if len(df) >= 20:
+            ret = df["close"].pct_change().dropna()
+            symbols.append(md.asset.symbol)
+            returns_list.append(ret.values[-60:])  # Last 60 days
+
+    if len(symbols) < 2:
+        console.print("[red]Not enough data for correlation.[/red]")
+        return
+
+    # Align lengths
+    min_len = min(len(r) for r in returns_list)
+    aligned = [r[:min_len] for r in returns_list]
+
+    matrix = np.corrcoef(aligned).tolist()
+    show_correlation_matrix(symbols, matrix)
+
+
+# ---------------------------------------------------------------------------
+# 20. Support / resistance levels
+# ---------------------------------------------------------------------------
+
+def support_resistance():
+    symbol = console.input("[bold]Symbol: [/bold]").strip().upper()
+    if not symbol:
+        return
+    console.print(f"[bold blue]Detecting levels for {symbol}...[/bold blue]")
+    try:
+        from analysis.levels import detect_levels, calc_pivot_points
+        md = fetch_asset(symbol, days=180)
+        levels = detect_levels(md.candles)
+        pivots = calc_pivot_points(md.candles)
+        show_levels(symbol, md.asset.current_price, levels, pivots)
+    except Exception as e:
+        console.print(f"[red]Failed: {e}[/red]")
+
+
+# ---------------------------------------------------------------------------
+# 21. Portfolio risk analysis
+# ---------------------------------------------------------------------------
+
+def portfolio_risk(db: Database):
+    trades = db.get_closed_trades(limit=200)
+    if not trades:
+        console.print("[dim]Need closed trades for risk analysis.[/dim]")
+        return
+
+    import numpy as np
+
+    pnls = [t.pnl for t in trades]
+    pnl_pcts = [t.pnl_pct for t in trades]
+
+    total_return = sum(pnls)
+    avg_return = np.mean(pnl_pcts)
+    std_return = np.std(pnl_pcts) if len(pnl_pcts) > 1 else 0
+
+    # Sharpe-like ratio (simplified: avg / std)
+    sharpe = avg_return / std_return if std_return > 0 else 0
+
+    # Max drawdown from cumulative P&L
+    cumulative = np.cumsum(pnls)
+    peak = np.maximum.accumulate(cumulative)
+    drawdowns = cumulative - peak
+    max_dd = float(np.min(drawdowns)) if len(drawdowns) > 0 else 0
+    max_dd_pct = (max_dd / settings.starting_capital) * 100
+
+    # Value at Risk (95th percentile)
+    if len(pnl_pcts) >= 5:
+        var_95 = float(np.percentile(pnl_pcts, 5))
+    else:
+        var_95 = min(pnl_pcts) if pnl_pcts else 0
+
+    # Expectancy
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p < 0]
+    win_rate = len(wins) / len(pnls) if pnls else 0
+    avg_win = np.mean(wins) if wins else 0
+    avg_loss = abs(np.mean(losses)) if losses else 0
+    expectancy = (win_rate * avg_win) - ((1 - win_rate) * avg_loss)
+
+    metrics = {
+        "Total Return": total_return,
+        "Avg Return Pct": avg_return,
+        "Std Dev Pct": std_return,
+        "Sharpe Ratio": sharpe,
+        "Max Drawdown": max_dd,
+        "Max Drawdown Pct": max_dd_pct,
+        "VaR (95%) Pct": var_95,
+        "Win Rate": f"{win_rate:.0%}",
+        "Expectancy": expectancy,
+        "Total Trades": str(len(trades)),
+    }
+
+    show_risk_analysis(metrics)
+
+
+# ---------------------------------------------------------------------------
+# 22. Trade journal
+# ---------------------------------------------------------------------------
+
+def trade_journal(db: Database):
+    notes = db.get_all_notes()
+    show_trade_journal(notes)
+
+    menu_text = "[a] Add note to a trade  [c] Back"
+    console.print(f"  [dim]{menu_text}[/dim]")
+    choice = console.input("[bold]> [/bold]").strip().lower()
+
+    if choice == "a":
+        trades = db.get_all_trades()
+        if not trades:
+            console.print("[dim]No trades to annotate.[/dim]")
+            return
+
+        for i, t in enumerate(trades[:10], 1):
+            status = "OPEN" if t.is_open else f"P&L ${t.pnl:+,.2f}"
+            console.print(f"  {i}. {t.symbol} {t.signal.value} @ ${t.entry_price:,.2f} — {status}")
+
+        try:
+            idx = int(console.input("  Trade #: ").strip()) - 1
+            if 0 <= idx < min(len(trades), 10):
+                note = console.input("  Note: ").strip()
+                if note:
+                    db.add_note(trades[idx].id, note)
+                    console.print("  [green]Note added.[/green]")
+        except (ValueError, IndexError):
+            console.print("[red]Invalid selection.[/red]")
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# 23. Earnings calendar
+# ---------------------------------------------------------------------------
+
+def earnings_calendar():
+    console.print("[bold blue]Fetching earnings calendar...[/bold blue]")
+    import yfinance as yf
+
+    results = []
+    for symbol in settings.stock_watchlist:
+        try:
+            ticker = yf.Ticker(symbol)
+            cal = ticker.calendar
+            if cal is not None and not (hasattr(cal, 'empty') and cal.empty):
+                if isinstance(cal, dict):
+                    earnings_date = cal.get("Earnings Date", ["Unknown"])[0] if "Earnings Date" in cal else None
+                    if earnings_date:
+                        results.append((symbol, {"date": str(earnings_date), "details": "Upcoming"}))
+                    else:
+                        results.append((symbol, {"date": "See yfinance", "details": str(list(cal.keys())[:3])}))
+                else:
+                    results.append((symbol, {"date": str(cal), "details": ""}))
+            else:
+                results.append((symbol, None))
+        except Exception:
+            results.append((symbol, None))
+
+    show_earnings(results)
+
+
+# ---------------------------------------------------------------------------
+# 24. News headlines
+# ---------------------------------------------------------------------------
+
+def news_headlines():
+    symbol = console.input("[bold]Symbol (e.g. AAPL): [/bold]").strip().upper()
+    if not symbol:
+        return
+
+    console.print(f"[bold blue]Fetching news for {symbol}...[/bold blue]")
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker(symbol)
+        raw_news = ticker.news or []
+        # yfinance nests title under 'content'
+        articles = []
+        for item in raw_news:
+            content = item.get("content", {}) if isinstance(item, dict) else {}
+            provider = content.get("provider", {})
+            articles.append({
+                "title": content.get("title", item.get("title", "No title")),
+                "publisher": provider.get("displayName", "") if isinstance(provider, dict) else str(provider),
+            })
+        show_news(symbol, articles)
+    except Exception as e:
+        console.print(f"[red]Failed: {e}[/red]")
+
+
+# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
@@ -632,6 +894,22 @@ def main():
                 export_data(db)
             elif choice == "16":
                 auto_scan(executor, db)
+            elif choice == "17":
+                price_chart()
+            elif choice == "18":
+                run_screener()
+            elif choice == "19":
+                correlation_matrix()
+            elif choice == "20":
+                support_resistance()
+            elif choice == "21":
+                portfolio_risk(db)
+            elif choice == "22":
+                trade_journal(db)
+            elif choice == "23":
+                earnings_calendar()
+            elif choice == "24":
+                news_headlines()
             elif choice in ("q", "quit", "exit"):
                 console.print("[dim]Goodbye.[/dim]")
                 break
