@@ -6,6 +6,7 @@ from pathlib import Path
 # Add project root to path so imports work
 sys.path.insert(0, str(Path(__file__).parent))
 
+from analysis.technical import analyze as technical_analyze
 from data.fetcher import fetch_all_watchlist, fetch_asset
 from storage.database import Database
 from strategy.signals import scan_and_recommend
@@ -16,9 +17,12 @@ from ui.dashboard import (
     prompt_approval,
     show_banner,
     show_closed_trades_for_selection,
+    show_indicator_detail,
     show_menu,
+    show_performance_stats,
     show_portfolio,
     show_positions,
+    show_recommendation_history,
     show_recommendations,
     show_trade_history,
     show_watchlist,
@@ -64,21 +68,38 @@ def scan_markets(executor: Executor):
 
 
 def view_portfolio(portfolio: Portfolio):
-    """Show portfolio summary."""
+    """Show portfolio summary with allocation."""
     portfolio.refresh()
     show_portfolio(portfolio.state)
 
 
-def view_positions(portfolio: Portfolio):
-    """Show open positions."""
+def view_positions_live(portfolio: Portfolio):
+    """Show open positions with live P&L."""
     portfolio.refresh()
-    show_positions(portfolio.state.positions)
+    positions = portfolio.state.positions
+
+    if not positions:
+        console.print("[dim]No open positions.[/dim]")
+        console.print()
+        return
+
+    console.print("[bold blue]Fetching live prices...[/bold blue]")
+    live_prices = {}
+    for trade in positions:
+        try:
+            md = fetch_asset(trade.symbol)
+            live_prices[trade.symbol] = md.asset.current_price
+        except Exception:
+            pass
+
+    show_positions(positions, live_prices)
 
 
 def view_history(db: Database):
-    """Show closed trade history."""
+    """Show closed trade history with performance stats."""
     trades = db.get_closed_trades()
     show_trade_history(trades)
+    show_performance_stats(trades)
 
 
 def close_position(executor: Executor):
@@ -147,6 +168,27 @@ def check_stops(executor: Executor):
     console.print()
 
 
+def indicator_detail():
+    """Analyze a single asset and show full indicator breakdown."""
+    symbol = console.input("[bold]Enter symbol (e.g. AAPL, BTC/USDT): [/bold]").strip()
+    if not symbol:
+        return
+
+    console.print(f"[bold blue]Analyzing {symbol}...[/bold blue]")
+    try:
+        md = fetch_asset(symbol)
+        summary = technical_analyze(md)
+        show_indicator_detail(md, summary)
+    except Exception as e:
+        console.print(f"[red]Failed to analyze {symbol}: {e}[/red]")
+
+
+def view_recommendation_history(db: Database):
+    """Show past recommendations."""
+    history = db.get_recommendation_history(limit=30)
+    show_recommendation_history(history)
+
+
 def main():
     """Main application loop."""
     db = Database()
@@ -171,13 +213,17 @@ def main():
             elif choice == "2":
                 view_portfolio(portfolio)
             elif choice == "3":
-                view_positions(portfolio)
+                view_positions_live(portfolio)
             elif choice == "4":
                 view_history(db)
             elif choice == "5":
                 close_position(executor)
             elif choice == "6":
                 check_stops(executor)
+            elif choice == "7":
+                indicator_detail()
+            elif choice == "8":
+                view_recommendation_history(db)
             elif choice in ("q", "quit", "exit"):
                 console.print("[dim]Goodbye.[/dim]")
                 break
