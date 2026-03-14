@@ -1,10 +1,10 @@
 # AI Market Agent
 
-A semi-autonomous AI trading agent that monitors stocks, crypto, and forex markets. It analyzes opportunities using 10 technical indicators with intensity-weighted scoring and optional Claude AI reasoning, presents recommendations for user approval, and tracks performance via paper trading.
+A semi-autonomous AI trading agent that monitors stocks, crypto, forex, commodities, and indices. It analyzes opportunities using 10 technical indicators with intensity-weighted scoring and optional Claude AI reasoning, presents recommendations for user approval, and tracks performance via paper trading.
 
 ## Features
 
-- **Multi-market scanning** — Stocks (yfinance), crypto (ccxt), forex — 18 assets by default
+- **Multi-market scanning** — Stocks, crypto, forex, commodities, indices — 27 assets across 5 markets
 - **10 technical indicators** — RSI, MACD, Stochastic, Bollinger Bands, SMA crossover, EMA crossover, ADX, OBV, ATR, volume analysis
 - **Intensity-weighted scoring** — Each indicator reports signal strength (0.0–1.0), weighted by category (trend, momentum, volume, volatility) with cross-category agreement bonuses
 - **AI reasoning** — Optional Claude API integration for deeper market analysis (60/40 AI/technical weighting)
@@ -68,11 +68,13 @@ Settings are loaded from environment variables (prefix `MARKET_AGENT_`) or a `.e
 | `MARKET_AGENT_DEFAULT_TAKE_PROFIT_PCT` | 0.15 | 15% take-profit |
 | `MARKET_AGENT_MIN_CONFIDENCE` | 0.15 | Minimum confidence to recommend |
 
-## Default Watchlist
+## Default Watchlist (27 assets)
 
 - **Stocks** (9): AAPL, MSFT, TSLA, GOOGL, AMZN, NVDA, META, AMD, JPM
 - **Crypto** (5): BTC/USDT, ETH/USDT, SOL/USDT, XRP/USDT, DOGE/USDT
 - **Forex** (4): EUR/USD, GBP/USD, USD/JPY, AUD/USD
+- **Commodities** (5): Gold (GC=F), Silver (SI=F), Crude Oil (CL=F), Natural Gas (NG=F), Copper (HG=F)
+- **Indices** (4): S&P 500 (^GSPC), Dow Jones (^DJI), Nasdaq (^IXIC), Russell 2000 (^RUT)
 
 ## Project Structure
 
@@ -81,7 +83,7 @@ market_agent/
 ├── main.py                  # Entry point, CLI menu
 ├── config.py                # Settings and preferences
 ├── data/
-│   ├── fetcher.py           # Market data fetching
+│   ├── fetcher.py           # Market data fetching (5 market types)
 │   └── models.py            # Data models (Asset, Trade, etc.)
 ├── analysis/
 │   ├── technical.py         # 10 technical indicators + scoring engine
