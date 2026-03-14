@@ -80,6 +80,14 @@ def show_menu():
     menu.add_row("[6]", "Check stop-loss / take-profit")
     menu.add_row("[7]", "Indicator detail (analyze single asset)")
     menu.add_row("[8]", "Recommendation history")
+    menu.add_row("[9]", "Market overview (sentiment summary)")
+    menu.add_row("[10]", "Watchlist manager")
+    menu.add_row("[11]", "Price alerts")
+    menu.add_row("[12]", "Compare two assets")
+    menu.add_row("[13]", "Multi-timeframe analysis")
+    menu.add_row("[14]", "Backtest strategy")
+    menu.add_row("[15]", "Export data to CSV")
+    menu.add_row("[16]", "Auto-scan mode")
     menu.add_row("[q]", "Quit")
     console.print(Panel(menu, title="[bold]Menu[/bold]", border_style="blue"))
     console.print()
@@ -529,3 +537,329 @@ def show_closed_trades_for_selection(positions: list[Trade]) -> int | None:
 
     console.print("[red]Invalid selection.[/red]")
     return None
+
+
+# ---------------------------------------------------------------------------
+# Market overview — sentiment summary
+# ---------------------------------------------------------------------------
+
+def show_market_overview(summaries: list[tuple[str, str, str, float]]):
+    """Show market sentiment overview.
+
+    summaries: list of (symbol, asset_type, signal, score)
+    """
+    buy_count = sum(1 for _, _, s, _ in summaries if s == "BUY")
+    sell_count = sum(1 for _, _, s, _ in summaries if s == "SELL")
+    hold_count = sum(1 for _, _, s, _ in summaries if s == "HOLD")
+    total = len(summaries)
+
+    # Overall sentiment
+    if buy_count > sell_count * 1.5:
+        sentiment = Text("BULLISH", style="bold green")
+    elif sell_count > buy_count * 1.5:
+        sentiment = Text("BEARISH", style="bold red")
+    else:
+        sentiment = Text("MIXED", style="bold yellow")
+
+    console.print(Panel(
+        f"  Overall: {sentiment}  |  "
+        f"[green]{buy_count} BUY[/green]  [red]{sell_count} SELL[/red]  [dim]{hold_count} HOLD[/dim]  "
+        f"({total} assets scanned)",
+        title="[bold]Market Sentiment[/bold]",
+        border_style="yellow",
+    ))
+
+    # Per asset-type breakdown
+    by_type: dict[str, list[tuple[str, str, float]]] = {}
+    for sym, atype, sig, score in summaries:
+        by_type.setdefault(atype, []).append((sym, sig, score))
+
+    table = Table(border_style="yellow", show_lines=False)
+    table.add_column("Market", style="bold")
+    table.add_column("BUY", style="green", justify="right")
+    table.add_column("SELL", style="red", justify="right")
+    table.add_column("HOLD", style="dim", justify="right")
+    table.add_column("Avg Score", justify="right")
+    table.add_column("Sentiment")
+
+    for atype, items in by_type.items():
+        b = sum(1 for _, s, _ in items if s == "BUY")
+        s = sum(1 for _, s, _ in items if s == "SELL")
+        h = sum(1 for _, s, _ in items if s == "HOLD")
+        avg = sum(sc for _, _, sc in items) / len(items)
+        if avg > 0.1:
+            sent = Text("BULLISH", style="green")
+        elif avg < -0.1:
+            sent = Text("BEARISH", style="red")
+        else:
+            sent = Text("NEUTRAL", style="dim")
+        table.add_row(atype.capitalize(), str(b), str(s), str(h), f"{avg:+.3f}", sent)
+
+    console.print(table)
+
+    # Top movers
+    sorted_by_score = sorted(summaries, key=lambda x: x[3])
+    most_bearish = sorted_by_score[:3]
+    most_bullish = sorted_by_score[-3:][::-1]
+
+    movers = Table(border_style="dim", show_lines=False)
+    movers.add_column("Most Bullish", style="green", min_width=20)
+    movers.add_column("Most Bearish", style="red", min_width=20)
+
+    for i in range(3):
+        bull = f"{most_bullish[i][0]} ({most_bullish[i][3]:+.3f})" if i < len(most_bullish) else ""
+        bear = f"{most_bearish[i][0]} ({most_bearish[i][3]:+.3f})" if i < len(most_bearish) else ""
+        movers.add_row(bull, bear)
+
+    console.print(movers)
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Watchlist manager
+# ---------------------------------------------------------------------------
+
+def show_watchlist_manager(current: list[str]):
+    """Display watchlist manager."""
+    console.print(Panel(
+        f"  {len(current)} assets: " + ", ".join(current[:10])
+        + (f"... +{len(current)-10} more" if len(current) > 10 else ""),
+        title="[bold]Watchlist Manager[/bold]",
+        border_style="blue",
+    ))
+    menu = Table(show_header=False, box=None, padding=(0, 2))
+    menu.add_column(style="bold cyan")
+    menu.add_column()
+    menu.add_row("[a]", "Add a symbol")
+    menu.add_row("[r]", "Remove a symbol")
+    menu.add_row("[l]", "List all")
+    menu.add_row("[c]", "Back to main menu")
+    console.print(menu)
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Price alerts
+# ---------------------------------------------------------------------------
+
+def show_alerts(alerts: list[dict]):
+    """Show active price alerts."""
+    if not alerts:
+        console.print("[dim]No active price alerts.[/dim]")
+        console.print()
+        return
+
+    table = Table(title="Active Price Alerts", border_style="yellow")
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Symbol", style="bold cyan")
+    table.add_column("Condition")
+    table.add_column("Target", justify="right")
+    table.add_column("Set", style="dim")
+
+    for i, a in enumerate(alerts, 1):
+        cond_style = "green" if a["condition"] == "above" else "red"
+        table.add_row(
+            str(i),
+            a["symbol"],
+            Text(a["condition"].upper(), style=cond_style),
+            f"${a['target_price']:,.2f}",
+            a["created_at"][:16],
+        )
+
+    console.print(table)
+    console.print()
+
+
+def show_triggered_alerts(triggered: list[tuple[dict, float]]):
+    """Show alerts that were just triggered."""
+    for alert, price in triggered:
+        console.print(
+            f"  [bold yellow]ALERT[/bold yellow] {alert['symbol']} is "
+            f"{'[green]above[/green]' if alert['condition'] == 'above' else '[red]below[/red]'} "
+            f"${alert['target_price']:,.2f} — now at ${price:,.2f}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Asset comparison
+# ---------------------------------------------------------------------------
+
+def show_asset_comparison(
+    md1: MarketData, summary1: TechnicalSummary,
+    md2: MarketData, summary2: TechnicalSummary,
+):
+    """Compare two assets side by side."""
+    console.print(Panel(
+        f"  [bold cyan]{md1.asset.symbol}[/bold cyan] vs [bold cyan]{md2.asset.symbol}[/bold cyan]",
+        title="[bold]Asset Comparison[/bold]",
+        border_style="cyan",
+    ))
+
+    table = Table(border_style="cyan", show_lines=True)
+    table.add_column("Indicator", style="bold", min_width=12)
+    table.add_column(md1.asset.symbol, justify="center", min_width=18)
+    table.add_column(md2.asset.symbol, justify="center", min_width=18)
+
+    # Price row
+    table.add_row("Price", f"${md1.asset.current_price:,.2f}", f"${md2.asset.current_price:,.2f}")
+    table.add_row(
+        "Signal",
+        Text(summary1.overall_signal.value, style=signal_style(summary1.overall_signal)),
+        Text(summary2.overall_signal.value, style=signal_style(summary2.overall_signal)),
+    )
+    table.add_row(
+        "Confidence",
+        Text(f"{abs(summary1.overall_score)*100:.0f}%", style=signal_style(summary1.overall_signal)),
+        Text(f"{abs(summary2.overall_score)*100:.0f}%", style=signal_style(summary2.overall_signal)),
+    )
+
+    # Per indicator
+    for i in range(min(len(summary1.indicators), len(summary2.indicators))):
+        ind1 = summary1.indicators[i]
+        ind2 = summary2.indicators[i]
+        s1 = signal_style(ind1.signal)
+        s2 = signal_style(ind2.signal)
+        table.add_row(
+            ind1.name,
+            Text(f"{ind1.signal.value} I={ind1.intensity:.2f}", style=s1),
+            Text(f"{ind2.signal.value} I={ind2.intensity:.2f}", style=s2),
+        )
+
+    console.print(table)
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Multi-timeframe analysis
+# ---------------------------------------------------------------------------
+
+def show_multi_timeframe(symbol: str, daily_summary: TechnicalSummary, weekly_summary: TechnicalSummary):
+    """Show daily vs weekly analysis comparison."""
+    console.print(Panel(
+        f"  [bold cyan]{symbol}[/bold cyan] — Multi-Timeframe Analysis",
+        title="[bold]Daily vs Weekly[/bold]",
+        border_style="magenta",
+    ))
+
+    table = Table(border_style="magenta", show_lines=True)
+    table.add_column("Indicator", style="bold", min_width=12)
+    table.add_column("Daily", justify="center", min_width=16)
+    table.add_column("Weekly", justify="center", min_width=16)
+    table.add_column("Agreement")
+
+    table.add_row(
+        "Overall",
+        Text(f"{daily_summary.overall_signal.value} ({abs(daily_summary.overall_score)*100:.0f}%)",
+             style=signal_style(daily_summary.overall_signal)),
+        Text(f"{weekly_summary.overall_signal.value} ({abs(weekly_summary.overall_score)*100:.0f}%)",
+             style=signal_style(weekly_summary.overall_signal)),
+        Text("YES", style="green") if daily_summary.overall_signal == weekly_summary.overall_signal
+        else Text("NO", style="red"),
+    )
+
+    for i in range(min(len(daily_summary.indicators), len(weekly_summary.indicators))):
+        d = daily_summary.indicators[i]
+        w = weekly_summary.indicators[i]
+        agree = d.signal == w.signal and d.signal != SignalType.HOLD
+        table.add_row(
+            d.name,
+            Text(f"{d.signal.value} I={d.intensity:.2f}", style=signal_style(d.signal)),
+            Text(f"{w.signal.value} I={w.intensity:.2f}", style=signal_style(w.signal)),
+            Text("YES", style="green") if agree else (Text("—", style="dim") if d.signal == SignalType.HOLD and w.signal == SignalType.HOLD else Text("NO", style="red")),
+        )
+
+    console.print(table)
+
+    # Agreement count
+    agreements = sum(
+        1 for i in range(min(len(daily_summary.indicators), len(weekly_summary.indicators)))
+        if daily_summary.indicators[i].signal == weekly_summary.indicators[i].signal
+        and daily_summary.indicators[i].signal != SignalType.HOLD
+    )
+    total_active = sum(
+        1 for i in range(min(len(daily_summary.indicators), len(weekly_summary.indicators)))
+        if daily_summary.indicators[i].signal != SignalType.HOLD
+        or weekly_summary.indicators[i].signal != SignalType.HOLD
+    )
+    if total_active > 0:
+        console.print(f"  [dim]Timeframe agreement: {agreements}/{total_active} active indicators align[/dim]")
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Backtest results
+# ---------------------------------------------------------------------------
+
+def show_backtest_results(result):
+    """Show backtest results."""
+    from analysis.backtest import BacktestResult
+    r: BacktestResult = result
+
+    console.print(Panel(
+        f"  [bold cyan]{r.symbol}[/bold cyan] — {r.period_days} day backtest  |  "
+        f"{r.total_signals} signals  |  {len(r.trades)} trades",
+        title="[bold]Backtest Results[/bold]",
+        border_style="green",
+    ))
+
+    if not r.trades:
+        console.print("[dim]No trades generated during backtest period.[/dim]")
+        console.print()
+        return
+
+    # Summary stats
+    table = Table(border_style="green")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Total P&L", Text(f"{r.total_pnl_pct:+.2f}%", style=pnl_style(r.total_pnl_pct)))
+    table.add_row("Avg P&L / Trade", Text(f"{r.avg_pnl_pct:+.2f}%", style=pnl_style(r.avg_pnl_pct)))
+    table.add_row("Best Trade", Text(f"{r.best_pct:+.2f}%", style="green"))
+    table.add_row("Worst Trade", Text(f"{r.worst_pct:+.2f}%", style="red"))
+    table.add_row("Win Rate", f"{r.win_rate:.0%} ({r.win_count}W / {r.loss_count}L)")
+
+    console.print(table)
+
+    # Trade list (last 15)
+    trades_to_show = r.trades[-15:]
+    t_table = Table(title=f"Trades (last {len(trades_to_show)})", border_style="dim", show_lines=False)
+    t_table.add_column("Entry", style="dim")
+    t_table.add_column("Exit", style="dim")
+    t_table.add_column("Signal")
+    t_table.add_column("Entry $", justify="right")
+    t_table.add_column("Exit $", justify="right")
+    t_table.add_column("P&L %", justify="right")
+    t_table.add_column("Conf", justify="right", style="dim")
+
+    for t in trades_to_show:
+        ps = pnl_style(t.pnl_pct)
+        sig = SignalType.BUY if t.signal == "BUY" else SignalType.SELL
+        t_table.add_row(
+            t.entry_date,
+            t.exit_date,
+            Text(t.signal, style=signal_style(sig)),
+            f"${t.entry_price:,.2f}",
+            f"${t.exit_price:,.2f}",
+            Text(f"{t.pnl_pct:+.2f}%", style=ps),
+            f"{t.confidence:.0%}",
+        )
+
+    console.print(t_table)
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# Export confirmation
+# ---------------------------------------------------------------------------
+
+def show_export_menu():
+    """Show export options."""
+    menu = Table(show_header=False, box=None, padding=(0, 2))
+    menu.add_column(style="bold cyan")
+    menu.add_column()
+    menu.add_row("[a]", "Export all (trades + portfolio + recommendations)")
+    menu.add_row("[t]", "Export trades only")
+    menu.add_row("[r]", "Export recommendations only")
+    menu.add_row("[c]", "Cancel")
+    console.print(Panel(menu, title="[bold]Export to CSV[/bold]", border_style="blue"))
+    console.print()

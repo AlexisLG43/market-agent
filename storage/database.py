@@ -57,6 +57,16 @@ class Database:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS price_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                condition TEXT NOT NULL,
+                target_price REAL NOT NULL,
+                created_at TEXT NOT NULL,
+                triggered INTEGER DEFAULT 0,
+                triggered_at TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS recommendation_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 symbol TEXT NOT NULL,
@@ -184,6 +194,43 @@ class Database:
         rows = conn.execute(
             "SELECT * FROM recommendation_history ORDER BY created_at DESC LIMIT ?",
             (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # --- Price Alerts ---
+
+    def add_alert(self, symbol: str, condition: str, target_price: float):
+        conn = self._get_conn()
+        conn.execute(
+            "INSERT INTO price_alerts (symbol, condition, target_price, created_at) VALUES (?, ?, ?, ?)",
+            (symbol, condition, target_price, datetime.now().isoformat()),
+        )
+        conn.commit()
+
+    def get_active_alerts(self) -> list[dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM price_alerts WHERE triggered = 0 ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def trigger_alert(self, alert_id: int):
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE price_alerts SET triggered = 1, triggered_at = ? WHERE id = ?",
+            (datetime.now().isoformat(), alert_id),
+        )
+        conn.commit()
+
+    def delete_alert(self, alert_id: int):
+        conn = self._get_conn()
+        conn.execute("DELETE FROM price_alerts WHERE id = ?", (alert_id,))
+        conn.commit()
+
+    def get_alert_history(self, limit: int = 20) -> list[dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM price_alerts ORDER BY created_at DESC LIMIT ?", (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
 
