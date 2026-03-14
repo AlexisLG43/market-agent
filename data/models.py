@@ -49,11 +49,21 @@ class MarketData(BaseModel):
     fetch_time: datetime = Field(default_factory=datetime.now)
 
 
+class IndicatorCategory(str, Enum):
+    TREND = "trend"
+    MOMENTUM = "momentum"
+    VOLUME = "volume"
+    VOLATILITY = "volatility"
+
+
 class IndicatorResult(BaseModel):
     """Result of a single technical indicator."""
     name: str
     value: float
     signal: SignalType
+    intensity: float = 0.5  # 0.0 (weak) to 1.0 (extreme) — how strong the signal is
+    category: IndicatorCategory = IndicatorCategory.MOMENTUM
+    weight: float = 1.0  # Relative importance
     description: str = ""
 
 
