@@ -10,8 +10,16 @@ A semi-autonomous AI trading agent that monitors stocks, crypto, forex, commodit
 - **AI reasoning** — Optional Claude API integration for deeper market analysis (60/40 AI/technical weighting)
 - **Paper trading** — $100K virtual portfolio with full P&L tracking
 - **Risk management** — Confidence-scaled position sizing, stop-loss, take-profit, exposure limits
+- **Market overview** — Sentiment summary across all markets with per-sector breakdown and top movers
+- **Asset comparison** — Side-by-side indicator breakdown for any two assets
+- **Multi-timeframe analysis** — Compare daily vs weekly signals for stronger confirmation
+- **Backtesting** — Test strategy on historical data with trade-by-trade results and performance stats
+- **Price alerts** — Set above/below price triggers, checked on demand or during auto-scan
+- **Watchlist manager** — Add/remove assets interactively with live price validation
+- **Auto-scan mode** — Continuous market scanning on configurable interval with alerts and auto stop-loss
+- **CSV export** — Export trades, recommendations, and portfolio data
 - **Rich CLI dashboard** — Color-coded tables, trend arrows, intensity bars, allocation charts
-- **SQLite persistence** — All trades, portfolio state, and recommendation history saved
+- **SQLite persistence** — All trades, portfolio state, alerts, and recommendation history saved
 
 ## Quick Start
 
@@ -25,16 +33,26 @@ python main.py
 
 ## Usage
 
-The agent presents an interactive menu:
+The agent presents a 16-option interactive menu:
 
-1. **Scan markets** — Fetch live data, run 10 indicators, get scored recommendations
-2. **View portfolio** — Cash, total value, P&L, win rate, allocation bar
-3. **View positions** — Open trades with live unrealized P&L (fetches current prices)
-4. **View trade history** — Closed trades with performance stats (best/worst, avg win/loss, profit factor)
-5. **Close a position** — Manually exit a trade at current market price
-6. **Check stops** — Auto-close positions that hit stop-loss or take-profit
-7. **Indicator detail** — Deep dive into all 10 indicators for any symbol with intensity bars, impact scores, and category summary
-8. **Recommendation history** — Past recommendations with approved/rejected status and approval rate
+| # | Feature | Description |
+|---|---|---|
+| 1 | **Scan markets** | Fetch live data, run 10 indicators, get scored recommendations |
+| 2 | **Portfolio** | Cash, total value, P&L, win rate, visual allocation bar |
+| 3 | **Open positions** | Live unrealized P&L (fetches current prices) |
+| 4 | **Trade history** | Closed trades + performance stats (best/worst, avg win/loss, profit factor) |
+| 5 | **Close position** | Manually exit a trade at current market price |
+| 6 | **Check stops** | Auto-close positions hitting stop-loss or take-profit |
+| 7 | **Indicator detail** | All 10 indicators for any symbol with intensity bars, impact scores, category summary |
+| 8 | **Recommendation history** | Past recs with approved/rejected status and approval rate |
+| 9 | **Market overview** | Sentiment across all 5 markets, top bullish/bearish movers |
+| 10 | **Watchlist manager** | Add/remove/list assets with live validation |
+| 11 | **Price alerts** | Set above/below price triggers, check manually or auto |
+| 12 | **Compare assets** | Side-by-side indicator comparison (e.g. AAPL vs NVDA) |
+| 13 | **Multi-timeframe** | Daily vs weekly signal agreement analysis |
+| 14 | **Backtest** | Test strategy on historical data (configurable period + hold days) |
+| 15 | **Export CSV** | Export trades, recommendations, and portfolio to CSV files |
+| 16 | **Auto-scan** | Continuous scanning on timer with alerts + stop-loss checks |
 
 Each recommendation shows the signal (BUY/SELL), confidence %, entry price, stop/target levels, position size, and indicator vote breakdown. You approve or reject each one before any trade is executed.
 
@@ -76,18 +94,21 @@ Settings are loaded from environment variables (prefix `MARKET_AGENT_`) or a `.e
 - **Commodities** (5): Gold (GC=F), Silver (SI=F), Crude Oil (CL=F), Natural Gas (NG=F), Copper (HG=F)
 - **Indices** (4): S&P 500 (^GSPC), Dow Jones (^DJI), Nasdaq (^IXIC), Russell 2000 (^RUT)
 
+Assets can be added or removed at runtime via the watchlist manager (menu option 10).
+
 ## Project Structure
 
 ```
 market_agent/
-├── main.py                  # Entry point, CLI menu
+├── main.py                  # Entry point, 16-option CLI menu
 ├── config.py                # Settings and preferences
 ├── data/
 │   ├── fetcher.py           # Market data fetching (5 market types)
 │   └── models.py            # Data models (Asset, Trade, etc.)
 ├── analysis/
 │   ├── technical.py         # 10 technical indicators + scoring engine
-│   └── ai_analyst.py        # Claude API analysis
+│   ├── ai_analyst.py        # Claude API analysis
+│   └── backtest.py          # Backtesting engine
 ├── strategy/
 │   ├── signals.py           # Signal generation (technical + AI)
 │   └── risk.py              # Risk management, position sizing
@@ -95,9 +116,9 @@ market_agent/
 │   ├── portfolio.py         # Paper trading engine
 │   └── executor.py          # Trade execution
 ├── storage/
-│   └── database.py          # SQLite persistence
+│   └── database.py          # SQLite persistence (trades, alerts, history)
 └── ui/
-    └── dashboard.py         # Rich CLI dashboard
+    └── dashboard.py         # Rich CLI dashboard (all views)
 ```
 
 ## Disclaimer
