@@ -10,6 +10,8 @@ class AssetType(str, Enum):
     STOCK = "stock"
     CRYPTO = "crypto"
     FOREX = "forex"
+    COMMODITY = "commodity"
+    INDEX = "index"
 
 
 class SignalType(str, Enum):

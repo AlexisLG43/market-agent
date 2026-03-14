@@ -15,6 +15,10 @@ def detect_asset_type(symbol: str) -> AssetType:
         return AssetType.CRYPTO
     if symbol.endswith("=X"):
         return AssetType.FOREX
+    if symbol.endswith("=F"):
+        return AssetType.COMMODITY
+    if symbol.startswith("^"):
+        return AssetType.INDEX
     return AssetType.STOCK
 
 
@@ -109,6 +113,18 @@ def _fetch_via_yfinance(symbol: str, asset_type: AssetType, days: int) -> Market
     return MarketData(asset=asset, candles=candles)
 
 
+def fetch_commodity(symbol: str, days: int | None = None) -> MarketData:
+    """Fetch commodity futures data via yfinance (e.g. GC=F for gold)."""
+    days = days or settings.lookback_days
+    return _fetch_via_yfinance(symbol, AssetType.COMMODITY, days)
+
+
+def fetch_index(symbol: str, days: int | None = None) -> MarketData:
+    """Fetch index data via yfinance (e.g. ^GSPC for S&P 500)."""
+    days = days or settings.lookback_days
+    return _fetch_via_yfinance(symbol, AssetType.INDEX, days)
+
+
 def fetch_asset(symbol: str, days: int | None = None) -> MarketData:
     """Fetch data for any asset, auto-detecting type."""
     asset_type = detect_asset_type(symbol)
@@ -116,6 +132,10 @@ def fetch_asset(symbol: str, days: int | None = None) -> MarketData:
         return fetch_crypto(symbol, days)
     elif asset_type == AssetType.FOREX:
         return fetch_forex(symbol, days)
+    elif asset_type == AssetType.COMMODITY:
+        return fetch_commodity(symbol, days)
+    elif asset_type == AssetType.INDEX:
+        return fetch_index(symbol, days)
     else:
         return fetch_stock(symbol, days)
 

@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     forex_watchlist: list[str] = Field(
         default=["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X"]
     )
+    commodity_watchlist: list[str] = Field(
+        default=["GC=F", "SI=F", "CL=F", "NG=F", "HG=F"]
+    )
+    index_watchlist: list[str] = Field(
+        default=["^GSPC", "^DJI", "^IXIC", "^RUT"]
+    )
 
     # Risk parameters
     max_position_pct: float = 0.10  # Max 10% of portfolio per position
@@ -43,7 +49,8 @@ class Settings(BaseSettings):
 
     @property
     def all_watchlist(self) -> list[str]:
-        return self.stock_watchlist + self.crypto_watchlist + self.forex_watchlist
+        return (self.stock_watchlist + self.crypto_watchlist + self.forex_watchlist
+                + self.commodity_watchlist + self.index_watchlist)
 
     @property
     def has_claude(self) -> bool:
