@@ -1,0 +1,9 @@
+yfinance>=0.2.31
+ccxt>=4.1.0
+pandas>=2.1.0
+numpy>=1.24.0
+ta>=0.11.0
+anthropic>=0.39.0
+rich>=13.7.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
