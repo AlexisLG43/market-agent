@@ -16,13 +16,13 @@ class Settings(BaseSettings):
 
     # Watchlist defaults
     stock_watchlist: list[str] = Field(
-        default=["AAPL", "MSFT", "TSLA"]
+        default=["AAPL", "MSFT", "TSLA", "GOOGL", "AMZN", "NVDA", "META", "AMD", "JPM"]
     )
     crypto_watchlist: list[str] = Field(
-        default=["BTC/USDT", "ETH/USDT"]
+        default=["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT"]
     )
     forex_watchlist: list[str] = Field(
-        default=["EURUSD=X", "GBPUSD=X"]
+        default=["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X"]
     )
 
     # Risk parameters
