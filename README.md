@@ -10,16 +10,24 @@ A semi-autonomous AI trading agent that monitors stocks, crypto, forex, commodit
 - **AI reasoning** — Optional Claude API integration for deeper market analysis (60/40 AI/technical weighting)
 - **Paper trading** — $100K virtual portfolio with full P&L tracking
 - **Risk management** — Confidence-scaled position sizing, stop-loss, take-profit, exposure limits
+- **ASCII price charts** — Visual price charts in the terminal with up/down markers
 - **Market overview** — Sentiment summary across all markets with per-sector breakdown and top movers
+- **Asset screener** — Filter watchlist by indicator presets (oversold, trending, high volume, etc.)
+- **Correlation matrix** — See which assets move together for diversification
 - **Asset comparison** — Side-by-side indicator breakdown for any two assets
 - **Multi-timeframe analysis** — Compare daily vs weekly signals for stronger confirmation
+- **Support/resistance levels** — Detect key price levels via local min/max + pivot points
 - **Backtesting** — Test strategy on historical data with trade-by-trade results and performance stats
+- **Portfolio risk analysis** — Sharpe ratio, max drawdown, VaR, expectancy
 - **Price alerts** — Set above/below price triggers, checked on demand or during auto-scan
+- **Trade journal** — Add notes to trades for learning and review
 - **Watchlist manager** — Add/remove assets interactively with live price validation
+- **Earnings calendar** — Track upcoming earnings for stock watchlist
+- **News headlines** — Fetch latest news for any asset via yfinance
 - **Auto-scan mode** — Continuous market scanning on configurable interval with alerts and auto stop-loss
 - **CSV export** — Export trades, recommendations, and portfolio data
 - **Rich CLI dashboard** — Color-coded tables, trend arrows, intensity bars, allocation charts
-- **SQLite persistence** — All trades, portfolio state, alerts, and recommendation history saved
+- **SQLite persistence** — All trades, portfolio state, alerts, notes, and recommendation history saved
 
 ## Quick Start
 
@@ -33,7 +41,7 @@ python main.py
 
 ## Usage
 
-The agent presents a 16-option interactive menu:
+The agent presents a 24-option interactive menu:
 
 | # | Feature | Description |
 |---|---|---|
@@ -53,6 +61,14 @@ The agent presents a 16-option interactive menu:
 | 14 | **Backtest** | Test strategy on historical data (configurable period + hold days) |
 | 15 | **Export CSV** | Export trades, recommendations, and portfolio to CSV files |
 | 16 | **Auto-scan** | Continuous scanning on timer with alerts + stop-loss checks |
+| 17 | **Price chart** | ASCII price chart with up/down markers and date axis |
+| 18 | **Screener** | Filter assets by presets: oversold, overbought, trending, high volume, strong signals |
+| 19 | **Correlation matrix** | 90-day return correlation across watchlist for diversification |
+| 20 | **Support/resistance** | Key price levels via local min/max detection + classic pivot points |
+| 21 | **Portfolio risk** | Sharpe ratio, max drawdown, VaR (95%), win rate, expectancy |
+| 22 | **Trade journal** | Add notes to any trade for learning and review |
+| 23 | **Earnings calendar** | Upcoming earnings dates for stock watchlist |
+| 24 | **News headlines** | Latest news for any asset with title and publisher |
 
 Each recommendation shows the signal (BUY/SELL), confidence %, entry price, stop/target levels, position size, and indicator vote breakdown. You approve or reject each one before any trade is executed.
 
@@ -100,7 +116,7 @@ Assets can be added or removed at runtime via the watchlist manager (menu option
 
 ```
 market_agent/
-├── main.py                  # Entry point, 16-option CLI menu
+├── main.py                  # Entry point, 24-option CLI menu
 ├── config.py                # Settings and preferences
 ├── data/
 │   ├── fetcher.py           # Market data fetching (5 market types)
@@ -108,7 +124,10 @@ market_agent/
 ├── analysis/
 │   ├── technical.py         # 10 technical indicators + scoring engine
 │   ├── ai_analyst.py        # Claude API analysis
-│   └── backtest.py          # Backtesting engine
+│   ├── backtest.py          # Backtesting engine
+│   ├── charts.py            # ASCII price charts
+│   ├── screener.py          # Asset screener with presets
+│   └── levels.py            # Support/resistance detection
 ├── strategy/
 │   ├── signals.py           # Signal generation (technical + AI)
 │   └── risk.py              # Risk management, position sizing
@@ -116,7 +135,7 @@ market_agent/
 │   ├── portfolio.py         # Paper trading engine
 │   └── executor.py          # Trade execution
 ├── storage/
-│   └── database.py          # SQLite persistence (trades, alerts, history)
+│   └── database.py          # SQLite persistence (trades, alerts, notes, history)
 └── ui/
     └── dashboard.py         # Rich CLI dashboard (all views)
 ```
